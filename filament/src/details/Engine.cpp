@@ -251,6 +251,7 @@ FEngine::FEngine(Builder const& builder) :
         mRenderableManager(*this),
         mLightManager(*this),
         mCameraManager(*this),
+        mMaterialCache(*this),
         mCommandBufferQueue(
                 builder->mConfig.minCommandBufferSizeMB * MiB,
                 builder->mConfig.commandBufferSizeMB * MiB,
