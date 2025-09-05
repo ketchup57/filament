@@ -315,7 +315,9 @@ public:
     FMorphTargetBuffer* createMorphTargetBuffer(const MorphTargetBuffer::Builder& builder) noexcept;
     FInstanceBuffer* createInstanceBuffer(const InstanceBuffer::Builder& builder) noexcept;
     FIndirectLight* createIndirectLight(const IndirectLight::Builder& builder) noexcept;
-    FMaterial* createMaterial(const Material::Builder& builder, std::unique_ptr<MaterialParser> materialParser) noexcept;
+    FMaterial* createMaterial(const Material::Builder& builder,
+            MaterialCache::DefinitionHandle definitionHandle,
+            MaterialDefinition definition) noexcept;
     FTexture* createTexture(const Texture::Builder& builder) noexcept;
     FSkybox* createSkybox(const Skybox::Builder& builder) noexcept;
     FColorGrading* createColorGrading(const ColorGrading::Builder& builder) noexcept;

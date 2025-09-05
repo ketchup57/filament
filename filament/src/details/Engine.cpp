@@ -908,8 +908,9 @@ FIndirectLight* FEngine::createIndirectLight(const IndirectLight::Builder& build
 }
 
 FMaterial* FEngine::createMaterial(const Material::Builder& builder,
-        std::unique_ptr<MaterialParser> materialParser) noexcept {
-    return create(mMaterials, builder, std::move(materialParser));
+        MaterialCache::DefinitionHandle definitionHandle,
+        MaterialDefinition definition) noexcept {
+    return create(mMaterials, builder, std::move(definitionHandle), std::move(definition));
 }
 
 FSkybox* FEngine::createSkybox(const Skybox::Builder& builder) noexcept {

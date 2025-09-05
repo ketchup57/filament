@@ -180,86 +180,21 @@ const char* toString(ShaderModel model) {
 }
 
 Material* Material::Builder::build(Engine& engine) const {
-    std::unique_ptr<MaterialParser> materialParser = createParser(
-        downcast(engine).getBackend(), downcast(engine).getShaderLanguage(),
-        mImpl->mPayload, mImpl->mSize);
-
-    if (!materialParser) {
-        return nullptr;
+    auto r = downcast(engine).getMaterialCache().getDefinition(mImpl->mPayload, mImpl->mSize);
+    if (r) {
+        return downcast(engine).createMaterial(*this, std::move(r->first), r->second);
     }
-
-    // Try checking CRC32 value for the package and skip if it's unavailable.
-    if (downcast(engine).features.material.check_crc32_after_loading) {
-        uint32_t parsedCrc32 = 0;
-        materialParser->getMaterialCrc32(&parsedCrc32);
-
-        constexpr size_t crc32ChunkSize = sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint32_t);
-        const size_t originalSize = mImpl->mSize - crc32ChunkSize;
-        assert_invariant(mImpl->mSize > crc32ChunkSize);
-
-        std::vector<uint32_t> crc32Table;
-        hash::crc32GenerateTable(crc32Table);
-        uint32_t expectedCrc32 = hash::crc32Update(0, mImpl->mPayload, originalSize, crc32Table);
-        if (parsedCrc32 != expectedCrc32) {
-            CString name;
-            materialParser->getName(&name);
-            LOG(ERROR) << "The material '" << name.c_str_safe()
-                       << "' is corrupted: crc32_expected=" << expectedCrc32
-                       << ", crc32_parsed=" << parsedCrc32;
-            return nullptr;
-        }
-    }
-
-    uint32_t v = 0;
-    materialParser->getShaderModels(&v);
-    bitset32 shaderModels;
-    shaderModels.setValue(v);
-
-    ShaderModel const shaderModel = downcast(engine).getShaderModel();
-    if (!shaderModels.test(static_cast<uint32_t>(shaderModel))) {
-        CString name;
-        materialParser->getName(&name);
-        char shaderModelsString[16];
-        snprintf(shaderModelsString, sizeof(shaderModelsString), "%#x", shaderModels.getValue());
-        LOG(ERROR) << "The material '" << name.c_str_safe() << "' was not built for "
-                   << toString(shaderModel) << ".";
-        LOG(ERROR) << "Compiled material contains shader models " << shaderModelsString << ".";
-        return nullptr;
-    }
-
-    // Print a warning if the material's stereo type doesn't align with the engine's setting.
-    MaterialDomain materialDomain;
-    UserVariantFilterMask variantFilterMask;
-    materialParser->getMaterialDomain(&materialDomain);
-    materialParser->getMaterialVariantFilterMask(&variantFilterMask);
-    bool const hasStereoVariants = !(variantFilterMask & UserVariantFilterMask(UserVariantFilterBit::STE));
-    if (materialDomain == MaterialDomain::SURFACE && hasStereoVariants) {
-        StereoscopicType const engineStereoscopicType = engine.getConfig().stereoscopicType;
-        // Default materials are always compiled with either 'instanced' or 'multiview'.
-        // So, we only verify compatibility if the engine is set up for stereo.
-        if (engineStereoscopicType != StereoscopicType::NONE) {
-            StereoscopicType materialStereoscopicType = StereoscopicType::NONE;
-            materialParser->getStereoscopicType(&materialStereoscopicType);
-            if (materialStereoscopicType != engineStereoscopicType) {
-                CString name;
-                materialParser->getName(&name);
-                LOG(WARNING) << "The stereoscopic type in the compiled material '"
-                             << name.c_str_safe() << "' is " << (int) materialStereoscopicType
-                             << ", which is not compatible with the engine's setting "
-                             << (int) engineStereoscopicType << ".";
-            }
-        }
-    }
-
-    return downcast(engine).createMaterial(*this, std::move(materialParser));
+    return nullptr;
 }
 
 FMaterial::FMaterial(FEngine& engine, const Builder& builder,
-        std::unique_ptr<MaterialParser> materialParser)
-        : mIsDefaultMaterial(builder->mDefaultMaterial),
+        MaterialCache::DefinitionHandle definitionHandle,
+        MaterialDefinition definition)
+        : mDefinition(std::move(definition)),
+          mIsDefaultMaterial(builder->mDefaultMaterial),
           mEngine(engine),
           mMaterialId(engine.getMaterialId()),
-          mMaterialParser(std::move(materialParser)) {
+          mDefinitionHandle(std::move(definitionHandle)) {
     MaterialParser* const parser = mMaterialParser.get();
 
     UTILS_UNUSED_IN_RELEASE bool const nameOk = parser->getName(&mName);
